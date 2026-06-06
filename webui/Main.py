@@ -1699,6 +1699,3 @@ if start_button:
     scroll_to_bottom()
 
 config.save_config()
-_bottom()
-
-config.save_config()

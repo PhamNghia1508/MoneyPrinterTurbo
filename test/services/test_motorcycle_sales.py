@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 
 from pydantic import ValidationError
 
@@ -587,6 +588,22 @@ class TestMotorcycleSalesPreset(unittest.TestCase):
         self.assertIn(listing.store_name, context)
         self.assertIn(listing.phone, context)
         self.assertIn(listing.address, context)
+
+
+class TestWebUISourceRegression(unittest.TestCase):
+    def test_main_page_has_one_final_config_save_and_no_undefined_bottom_call(self):
+        source = Path("webui/Main.py").read_text(encoding="utf-8")
+        footer = source[source.rfind("config.save_config()") - 100 :]
+
+        self.assertNotIn("\n_bottom()\n", source)
+        self.assertEqual(footer.count("config.save_config()"), 1)
+
+    def test_vietnamese_brand_text_decodes_cleanly(self):
+        source = Path("app/services/motorcycle_sales.py").read_text(encoding="utf-8")
+
+        self.assertIn("Minh Dũng", source)
+        self.assertIn("Quảng Ngãi", source)
+        self.assertNotIn("Minh DÆ", source)
 
 
 if __name__ == "__main__":
