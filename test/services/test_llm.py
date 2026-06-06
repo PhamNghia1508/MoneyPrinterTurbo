@@ -11,6 +11,11 @@ from pydantic import ValidationError
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from app.config import config
+from app.models.motorcycle import (
+    OdometerDisclosure,
+    PriceDisclosure,
+    UsedMotorcycleListing,
+)
 from app.models.schema import VideoScriptRequest, VideoSocialMetadataRequest
 from app.services import llm
 
@@ -112,6 +117,56 @@ class TestScriptPromptOptions(unittest.TestCase):
                 video_subject="咖啡",
                 video_script_prompt="x" * (llm.MAX_SCRIPT_PROMPT_LENGTH + 1),
             )
+
+
+class TestMotorcycleSalesScriptGeneration(unittest.TestCase):
+    def setUp(self):
+        self.listing = UsedMotorcycleListing(
+            name="Vision",
+            model_year="2020",
+            condition="Vận hành ổn định",
+            highlights=["Hồ sơ đầy đủ"],
+            price_disclosure=PriceDisclosure.contact,
+            odometer_disclosure=OdometerDisclosure.hidden,
+        )
+
+    def test_generate_sales_script_uses_specialized_prompt(self):
+        response = (
+            "Giá này mà gặp Vision đời 2020 giấy tờ đủ thì đáng xem nha! "
+            "Chiếc xe vận hành ổn định, phù hợp đi làm và đi phố mỗi ngày. "
+            "Hồ sơ pháp lý đầy đủ, cửa hàng hỗ trợ sang tên rõ ràng. "
+            "Giá cụ thể anh chị liên hệ để nhận mức tốt nhất. "
+            "Gọi Minh Dũng số 0902 143 241 hoặc ghé 08 Quang Trung, "
+            "TP. Quảng Ngãi để xem xe."
+        )
+        with patch.object(llm, "_generate_response", return_value=response) as generate:
+            result = llm.generate_motorcycle_sales_script(self.listing)
+
+        self.assertEqual(result["script"], response)
+        self.assertIn("Vision", generate.call_args.args[0])
+        self.assertIn("35-45 giây", generate.call_args.args[0])
+        self.assertIsInstance(result["warnings"], list)
+
+    def test_generate_sales_script_strips_markdown_markers_before_audit(self):
+        response = "**Vision** có hồ sơ đầy đủ. # Gọi Minh Dũng 0902 143 241 tại 08 Quang Trung, TP. Quảng Ngãi."
+
+        with patch.object(llm, "_generate_response", return_value=response):
+            result = llm.generate_motorcycle_sales_script(self.listing)
+
+        self.assertNotIn("*", result["script"])
+        self.assertNotIn("#", result["script"])
+
+    def test_generate_sales_script_returns_diagnostic_error_after_retries(self):
+        with patch.object(llm, "_generate_response", return_value="Error: api_key is not set"):
+            result = llm.generate_motorcycle_sales_script(self.listing)
+
+        self.assertEqual(result["script"], "Error: Error: api_key is not set")
+        self.assertEqual(result["warnings"], ["generation_failed"])
+
+    def test_generic_default_prompt_remains_generic(self):
+        self.assertIn("# Role: Video Script Generator", llm.DEFAULT_SCRIPT_SYSTEM_PROMPT)
+        self.assertNotIn("Alo ngay em Nghĩa", llm.DEFAULT_SCRIPT_SYSTEM_PROMPT)
+        self.assertNotIn("SIÊU NHIỆT HUYẾT", llm.DEFAULT_SCRIPT_SYSTEM_PROMPT)
 
 
 class TestLiteLLMProvider(unittest.TestCase):

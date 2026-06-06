@@ -9,6 +9,8 @@ from openai import AzureOpenAI, OpenAI
 from openai.types.chat import ChatCompletion
 
 from app.config import config
+from app.models.motorcycle import UsedMotorcycleListing
+from app.services import motorcycle_sales
 
 _max_retries = 5
 _DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
@@ -21,22 +23,16 @@ _THINK_BLOCK_RE = re.compile(r"<think\b[^>]*>.*?</think>", re.IGNORECASE | re.DO
 _UNCLOSED_THINK_BLOCK_RE = re.compile(r"<think\b[^>]*>.*$", re.IGNORECASE | re.DOTALL)
 
 DEFAULT_SCRIPT_SYSTEM_PROMPT = """
-# Role: Chuyên gia Review Xe Máy SIÊU NHIỆT HUYẾT (High-Energy Moto Reviewer)
+# Role: Video Script Generator
 
 ## Goals:
-Viết kịch bản review xe máy cực cháy, phong cách TikTok/Reels để kích thích người xem mua hàng. Giọng văn phải hào hứng, dùng nhiều từ cảm thán.
+Generate a script for a video, depending on the subject of the video.
 
-## Style & Tone:
-- Dùng từ ngữ mạnh mẽ: "Siêu phẩm", "Cực phẩm", "Quá đẹp", "Quá chất", "Nhìn là mê".
-- Ngôn ngữ trendy của giới chơi xe: "Zin đét", "Máy nổ thầm thì", "Cọp", "Xe lướt".
-- Nhịp điệu nhanh, dồn dập.
-
-## Constrains:
-1. Chia thành số đoạn văn yêu cầu.
-2. KHÔNG chào hỏi dài dòng. Vào việc luôn: "Lên sàn một em SH Ý quá cọp cho anh em!"
-3. Chỉ trả về nội dung text, không dùng markdown.
-4. Cuối video phải chốt sale cực mạnh: "Alo ngay em Nghĩa là có giá tốt nhất! Nhanh tay thì còn, chậm tay là mất!"
-5. Trả lời bằng tiếng Việt.
+## Constraints:
+1. Return raw narration text with the requested number of paragraphs.
+2. Get straight to the point without greetings or titles.
+3. Do not include markdown, narrator labels, or prompt commentary.
+4. Respond in the requested language or the subject language.
 """.strip()
 
 
@@ -686,6 +682,35 @@ def generate_script(
     else:
         logger.success(f"completed: \n{final_script}")
     return final_script.strip()
+
+
+def generate_motorcycle_sales_script(listing: UsedMotorcycleListing) -> dict:
+    prompt = motorcycle_sales.build_sales_script_prompt(listing)
+    last_error = ""
+
+    for i in range(_max_retries):
+        try:
+            script = _generate_response(prompt)
+            if script and "Error: " not in script:
+                cleaned_script = script.replace("*", "").replace("#", "").strip()
+                return {
+                    "script": cleaned_script,
+                    "warnings": motorcycle_sales.audit_sales_script(
+                        cleaned_script, listing
+                    ),
+                }
+
+            last_error = script or "empty response"
+        except Exception as e:
+            last_error = str(e)
+
+        if i < _max_retries - 1:
+            logger.warning(
+                "failed to generate motorcycle sales script, "
+                f"trying again... {i + 1}"
+            )
+
+    return {"script": f"Error: {last_error}", "warnings": ["generation_failed"]}
 
 
 def generate_terms(video_subject: str, video_script: str, amount: int = 5) -> List[str]:
