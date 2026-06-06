@@ -96,6 +96,15 @@ if "facebook_metadata" not in st.session_state:
         "caption": "",
         "hashtags": [],
     }
+if "zalo_metadata" not in st.session_state:
+    st.session_state["zalo_metadata"] = {"title": "", "caption": "", "hashtags": []}
+if "sales_content_package" not in st.session_state:
+    st.session_state["sales_content_package"] = {
+        "hook_options": [],
+        "shot_list": [],
+        "text_overlays": [],
+        "platform_captions": {},
+    }
 
 # 加载语言文件
 locales = utils.load_locales(i18n_dir)
@@ -788,23 +797,18 @@ with left_panel:
                         st.session_state["video_script"] = result["script"]
                         st.session_state["video_terms"] = ""
                         st.session_state["sales_script_warnings"] = result["warnings"]
-                        social_subject = motorcycle_sales.build_social_context(listing)
-                        st.session_state["tiktok_metadata"] = (
-                            llm.generate_social_metadata(
-                                video_subject=social_subject,
-                                video_script=result["script"],
-                                language="vi-VN",
-                                platform="tiktok",
-                            )
+                        sales_content_package = (
+                            motorcycle_sales.build_sales_content_package(listing)
                         )
-                        st.session_state["facebook_metadata"] = (
-                            llm.generate_social_metadata(
-                                video_subject=social_subject,
-                                video_script=result["script"],
-                                language="vi-VN",
-                                platform="facebook_reels",
-                            )
-                        )
+                        st.session_state["sales_content_package"] = sales_content_package
+                        platform_captions = sales_content_package["platform_captions"]
+                        st.session_state["tiktok_metadata"] = platform_captions["tiktok"]
+                        st.session_state["facebook_metadata"] = platform_captions[
+                            "facebook"
+                        ]
+                        st.session_state["zalo_metadata"] = platform_captions[
+                            "zalo_marketplace"
+                        ]
 
             params.video_subject = st.session_state.get("video_subject", "")
             if st.session_state["sales_script_warnings"]:
@@ -818,10 +822,45 @@ with left_panel:
             st.session_state["video_script"] = params.video_script
             params.video_terms = ""
 
+            sales_content_package = st.session_state["sales_content_package"]
+            if sales_content_package.get("hook_options"):
+                st.write("Sales Content Toolkit")
+                with st.expander("3 Hook Options", expanded=True):
+                    for index, hook in enumerate(
+                        sales_content_package.get("hook_options", []), start=1
+                    ):
+                        st.text_area(
+                            f"Hook {index}",
+                            value=hook,
+                            key=f"sales_hook_option_{index}",
+                            height=70,
+                        )
+
+                with st.expander("Shot List Quay Xe", expanded=False):
+                    for index, shot in enumerate(
+                        sales_content_package.get("shot_list", []), start=1
+                    ):
+                        st.markdown(
+                            f"**{index}. {shot.get('title', '')}**  \n"
+                            f"{shot.get('instruction', '')}"
+                        )
+
+                with st.expander("Text Overlay", expanded=False):
+                    overlays_text = "\n".join(
+                        sales_content_package.get("text_overlays", [])
+                    )
+                    st.text_area(
+                        "Overlay lines",
+                        value=overlays_text,
+                        key="sales_text_overlays",
+                        height=160,
+                    )
+
             st.write(tr("Social Metadata Drafts"))
             for label, state_key in (
                 ("TikTok", "tiktok_metadata"),
                 ("Facebook Reels", "facebook_metadata"),
+                ("Zalo/Marketplace", "zalo_metadata"),
             ):
                 metadata = st.session_state[state_key]
                 with st.expander(label, expanded=False):

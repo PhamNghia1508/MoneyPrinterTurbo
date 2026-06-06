@@ -589,6 +589,62 @@ class TestMotorcycleSalesPreset(unittest.TestCase):
         self.assertIn(listing.phone, context)
         self.assertIn(listing.address, context)
 
+    def test_sales_content_package_contains_shots_overlays_hooks_and_platform_captions(self):
+        listing = UsedMotorcycleListing(
+            name="Honda Vision",
+            model_year="2018",
+            condition="Xe cu, may no on, de nhe",
+            highlights=["Tiet kiem xang", "Ho so day du"],
+            price_disclosure=PriceDisclosure.public,
+            price=7000000,
+            odometer_disclosure=OdometerDisclosure.verified,
+            odometer_km=10000,
+            store_name="Minh Dung",
+            phone="0902 143 241",
+            address="08 Quang Trung, TP. Quang Ngai",
+        )
+
+        package = motorcycle_sales.build_sales_content_package(listing)
+
+        self.assertEqual(3, len(package["hook_options"]))
+        self.assertGreaterEqual(len(package["shot_list"]), 7)
+        self.assertIn("HONDA VISION 2018", package["text_overlays"])
+        self.assertIn("GIA: 7.000.000 DONG", package["text_overlays"])
+        self.assertIn("ODO: 10.000 KM DA XAC MINH", package["text_overlays"])
+        self.assertIn("HO SO PHAP LY DAY DU", package["text_overlays"])
+        self.assertIn("ZALO: 0902 143 241", package["text_overlays"])
+        self.assertIn("tiktok", package["platform_captions"])
+        self.assertIn("facebook", package["platform_captions"])
+        self.assertIn("zalo_marketplace", package["platform_captions"])
+        self.assertIn("7.000.000 đồng", package["platform_captions"]["facebook"]["caption"])
+        self.assertIn(
+            "0902 143 241",
+            package["platform_captions"]["zalo_marketplace"]["caption"],
+        )
+
+    def test_audit_flags_exaggerated_sales_claims(self):
+        listing = UsedMotorcycleListing(
+            name="Honda Vision",
+            model_year="2018",
+            condition="Xe cu, may no on",
+            highlights=["Ho so day du"],
+            price_disclosure=PriceDisclosure.contact,
+        )
+        script = (
+            "Honda Vision này bao đẹp, cam kết tuyệt đối không lỗi, "
+            "zin 100%, mới tinh, ngon nhất Quảng Ngãi. "
+            "Hồ sơ pháp lý đầy đủ. Gọi Minh Dũng 0902 143 241 tại 08 Quang Trung."
+        )
+
+        issues = motorcycle_sales.audit_sales_script(script, listing)
+
+        self.assertIn("unsupported_claim:bao đẹp", issues)
+        self.assertIn("unsupported_claim:cam kết tuyệt đối", issues)
+        self.assertIn("unsupported_claim:không lỗi", issues)
+        self.assertIn("unsupported_claim:zin 100%", issues)
+        self.assertIn("unsupported_claim:mới tinh", issues)
+        self.assertIn("unsupported_claim:ngon nhất quảng ngãi", issues)
+
 
 class TestWebUISourceRegression(unittest.TestCase):
     def test_main_page_has_one_final_config_save_and_no_undefined_bottom_call(self):
@@ -604,6 +660,15 @@ class TestWebUISourceRegression(unittest.TestCase):
         self.assertIn("Minh Dũng", source)
         self.assertIn("Quảng Ngãi", source)
         self.assertNotIn("Minh DÆ", source)
+
+    def test_main_page_exposes_sales_content_toolkit(self):
+        source = Path("webui/Main.py").read_text(encoding="utf-8")
+
+        self.assertIn("sales_content_package", source)
+        self.assertIn("3 Hook Options", source)
+        self.assertIn("Shot List Quay Xe", source)
+        self.assertIn("Text Overlay", source)
+        self.assertIn("Zalo/Marketplace", source)
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
 import re
+import unicodedata
 
 from app.models.motorcycle import (
     OdometerDisclosure,
@@ -19,6 +20,12 @@ UNSUPPORTED_CLAIMS = (
     "chưa đâm đụng",
     "máy nguyên bản",
     "bao không lỗi",
+    "bao đẹp",
+    "cam kết tuyệt đối",
+    "không lỗi",
+    "zin 100%",
+    "mới tinh",
+    "ngon nhất quảng ngãi",
 )
 
 MOTORCYCLE_SALES_SYSTEM_PROMPT = """
@@ -41,6 +48,15 @@ def format_vnd(value: int) -> str:
 
 def _format_number(value: int) -> str:
     return f"{value:,}".replace(",", ".")
+
+
+def _ascii_upper(value: str) -> str:
+    normalized = unicodedata.normalize("NFKD", value)
+    ascii_text = "".join(
+        character for character in normalized if not unicodedata.combining(character)
+    )
+    ascii_text = ascii_text.replace("đ", "d").replace("Đ", "D")
+    return re.sub(r"\s+", " ", ascii_text).strip().upper()
 
 
 def _mask_license_plate(license_plate: str) -> str:
@@ -306,3 +322,143 @@ def build_social_context(listing: UsedMotorcycleListing) -> str:
         f"Hồ sơ: {listing.legal_documents}. "
         f"Liên hệ {listing.store_name}, {listing.phone}, {listing.address}."
     )
+
+
+def build_hook_options(listing: UsedMotorcycleListing) -> list[str]:
+    price_hook = (
+        f"{format_vnd(listing.price)} có {listing.name} đời {listing.model_year}, "
+        "nghe đáng ghé xem đó nha!"
+        if listing.price_disclosure == PriceDisclosure.public
+        else f"{listing.name} đời {listing.model_year}, giá tốt thì hỏi nhanh kẻo lỡ nhịp nha!"
+    )
+    return [
+        price_hook,
+        f"Cần xe tay ga gọn, tiết kiệm xăng để đi làm hằng ngày? Xem chiếc {listing.name} này.",
+        f"Mua xe cũ sợ nhất giấy tờ; chiếc {listing.name} này có hồ sơ pháp lý rõ ràng để kiểm tra.",
+    ]
+
+
+def build_shot_list(listing: UsedMotorcycleListing) -> list[dict[str, str]]:
+    shots = [
+        {
+            "title": "Hook 1-3 giây",
+            "instruction": "Quay góc đẹp nhất của xe, ánh sáng rõ, xe chiếm phần lớn khung hình dọc.",
+        },
+        {
+            "title": "Toàn thân bên trái",
+            "instruction": "Quay ngang thân xe chậm để khách nhìn dáng tổng thể và dàn áo.",
+        },
+        {
+            "title": "Toàn thân bên phải",
+            "instruction": "Quay bên còn lại, giữ máy ổn định, tránh lia quá nhanh.",
+        },
+        {
+            "title": "Đầu xe và đèn",
+            "instruction": "Cận đầu xe, đèn, mặt nạ, tay lái và các vết trầy nếu có.",
+        },
+        {
+            "title": "Đuôi xe và bánh",
+            "instruction": "Cận đuôi xe, lốp, phanh, gầm sau để khách thấy tình trạng thật.",
+        },
+        {
+            "title": "Máy nổ / đề máy",
+            "instruction": "Quay thao tác đề máy, tiếng máy và lên ga nhẹ nếu có video thực tế.",
+        },
+        {
+            "title": "Hồ sơ pháp lý",
+            "instruction": "Quay giấy tờ đã che thông tin nhạy cảm, nhấn mạnh khách được kiểm tra trực tiếp.",
+        },
+        {
+            "title": "CTA cửa hàng",
+            "instruction": f"Chốt bằng bảng hiệu, mặt tiền hoặc xe tại cửa hàng {listing.store_name}.",
+        },
+    ]
+    if listing.odometer_disclosure == OdometerDisclosure.verified:
+        shots.insert(
+            5,
+            {
+                "title": "Đồng hồ ODO",
+                "instruction": f"Cận đồng hồ thể hiện ODO {_format_number(listing.odometer_km)} km đã xác minh.",
+            },
+        )
+    return shots
+
+
+def build_text_overlays(listing: UsedMotorcycleListing) -> list[str]:
+    overlays = [
+        _ascii_upper(f"{listing.name} {listing.model_year}"),
+    ]
+    if listing.price_disclosure == PriceDisclosure.public:
+        overlays.append(_ascii_upper(f"Gia: {format_vnd(listing.price)}"))
+    else:
+        overlays.append("GIA: LIEN HE DE NHAN GIA")
+    if listing.odometer_disclosure == OdometerDisclosure.verified:
+        overlays.append(
+            _ascii_upper(f"ODO: {_format_number(listing.odometer_km)} km da xac minh")
+        )
+    elif listing.odometer_disclosure == OdometerDisclosure.not_verified:
+        overlays.append("ODO: CHUA XAC MINH")
+    overlays.extend(
+        [
+            "HO SO PHAP LY DAY DU",
+            _ascii_upper(f"Zalo: {listing.phone}"),
+            _ascii_upper(listing.address),
+        ]
+    )
+    return overlays
+
+
+def build_platform_captions(listing: UsedMotorcycleListing) -> dict[str, dict]:
+    price_text = (
+        format_vnd(listing.price)
+        if listing.price_disclosure == PriceDisclosure.public
+        else "liên hệ để nhận giá"
+    )
+    odometer_text = ""
+    if listing.odometer_disclosure == OdometerDisclosure.verified:
+        odometer_text = f" ODO {_format_number(listing.odometer_km)} km đã xác minh."
+    elif listing.odometer_disclosure == OdometerDisclosure.not_verified:
+        odometer_text = " ODO chưa xác minh, khách xem thực tế tại cửa hàng."
+
+    base = (
+        f"{listing.name} đời {listing.model_year}, giá {price_text}.{odometer_text} "
+        f"Hồ sơ pháp lý đầy đủ. Xem xe tại {listing.address}. "
+        f"Liên hệ {listing.store_name}: {listing.phone}."
+    )
+    return {
+        "tiktok": {
+            "title": f"{listing.name} {listing.model_year} giá {price_text}",
+            "caption": base,
+            "hashtags": [
+                "#xemaycu",
+                "#hondavision",
+                "#quangngai",
+                "#minhdung",
+                "#xetayga",
+            ],
+        },
+        "facebook": {
+            "title": f"Bán {listing.name} đời {listing.model_year}",
+            "caption": base + " Khách nên đến xem trực tiếp và chạy thử trước khi quyết định.",
+            "hashtags": ["#XeMayCu", "#HondaVision", "#QuangNgai", "#MinhDung"],
+        },
+        "zalo_marketplace": {
+            "title": f"{listing.name} {listing.model_year}",
+            "caption": (
+                f"Cần bán {listing.name} đời {listing.model_year}. Giá {price_text}."
+                f"{odometer_text} Tình trạng: {listing.condition}. "
+                f"Hồ sơ: {listing.legal_documents}. "
+                f"Liên hệ {listing.phone}, xem xe tại {listing.address}."
+            ),
+            "hashtags": [],
+        },
+    }
+
+
+def build_sales_content_package(listing: UsedMotorcycleListing) -> dict:
+    return {
+        "hook_options": build_hook_options(listing),
+        "shot_list": build_shot_list(listing),
+        "text_overlays": build_text_overlays(listing),
+        "platform_captions": build_platform_captions(listing),
+    }
