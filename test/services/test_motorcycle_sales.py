@@ -7,6 +7,7 @@ from app.models.motorcycle import (
     PriceDisclosure,
     UsedMotorcycleListing,
 )
+from app.services import motorcycle_sales
 
 
 class TestUsedMotorcycleListing(unittest.TestCase):
@@ -135,6 +136,251 @@ class TestUsedMotorcycleListing(unittest.TestCase):
                         highlights=["Tiết kiệm xăng"],
                         **{field_name: "   "},
                     )
+
+
+class TestMotorcycleSalesPrompt(unittest.TestCase):
+    def setUp(self):
+        self.listing = UsedMotorcycleListing(
+            name="SH 150i nhập Ý",
+            model_year="2012",
+            odometer_disclosure=OdometerDisclosure.not_verified,
+            license_plate="76-B1 123.45",
+            price=68_000_000,
+            price_disclosure=PriceDisclosure.public,
+            condition="Máy vận hành êm, dàn áo còn đẹp theo hiện trạng",
+            highlights=["Hồ sơ pháp lý đầy đủ", "Hỗ trợ sang tên"],
+        )
+
+    def test_constants_and_vnd_format_match_sales_requirements(self):
+        self.assertEqual(motorcycle_sales.STORE_NAME, "Minh Dũng")
+        self.assertEqual(motorcycle_sales.STORE_PHONE, "0902 143 241")
+        self.assertEqual(
+            motorcycle_sales.STORE_ADDRESS,
+            "08 Quang Trung, TP. Quảng Ngãi",
+        )
+        self.assertEqual(motorcycle_sales.TARGET_MIN_WORDS, 90)
+        self.assertEqual(motorcycle_sales.TARGET_MAX_WORDS, 120)
+        self.assertEqual(motorcycle_sales.format_vnd(68_000_000), "68.000.000 đồng")
+
+    def test_system_prompt_sets_truthful_vietnamese_script_contract(self):
+        prompt = motorcycle_sales.MOTORCYCLE_SALES_SYSTEM_PROMPT
+
+        for requirement in (
+            "chỉ văn bản thô tiếng Việt",
+            "một câu",
+            "1-3 giây",
+            "90-120 từ",
+            "35-45 giây",
+            "hài hước vừa phải",
+            "không la hét liên tục",
+            "chỉ dùng sự thật",
+            "không tạo khan hiếm giả",
+            "pháp lý",
+            "giá công khai",
+            "giá liên hệ",
+            "tên cửa hàng",
+            "số điện thoại",
+            "địa chỉ",
+        ):
+            with self.subTest(requirement=requirement):
+                self.assertIn(requirement, prompt)
+
+    def test_prompt_contains_listing_facts_public_price_and_contact(self):
+        prompt = motorcycle_sales.build_sales_script_prompt(self.listing)
+
+        for value in (
+            "SH 150i nhập Ý",
+            "2012",
+            "Máy vận hành êm, dàn áo còn đẹp theo hiện trạng",
+            "Hồ sơ pháp lý đầy đủ",
+            "Hỗ trợ sang tên",
+            "68.000.000 đồng",
+            "Minh Dũng",
+            "0902 143 241",
+            "08 Quang Trung, TP. Quảng Ngãi",
+        ):
+            with self.subTest(value=value):
+                self.assertIn(value, prompt)
+
+    def test_unverified_odometer_uses_exact_caution(self):
+        prompt = motorcycle_sales.build_sales_script_prompt(self.listing)
+
+        self.assertIn("ODO: chưa xác minh, không được khẳng định", prompt)
+        self.assertNotIn("ODO chuẩn", prompt)
+
+    def test_verified_odometer_renders_number(self):
+        listing = self.listing.model_copy(
+            update={
+                "odometer_km": 25_000,
+                "odometer_disclosure": OdometerDisclosure.verified,
+            }
+        )
+
+        prompt = motorcycle_sales.build_sales_script_prompt(listing)
+
+        self.assertIn("ODO đã xác nhận: 25.000 km", prompt)
+
+    def test_hidden_odometer_instructs_script_not_to_mention_it(self):
+        listing = self.listing.model_copy(
+            update={"odometer_disclosure": OdometerDisclosure.hidden}
+        )
+
+        prompt = motorcycle_sales.build_sales_script_prompt(listing)
+
+        self.assertIn("ODO: không công bố, không nhắc trong kịch bản", prompt)
+
+    def test_contact_price_uses_exact_non_numeric_instruction(self):
+        listing = self.listing.model_copy(
+            update={"price": None, "price_disclosure": PriceDisclosure.contact}
+        )
+
+        prompt = motorcycle_sales.build_sales_script_prompt(listing)
+
+        self.assertIn("không đọc một con số giá", prompt)
+        self.assertIn("liên hệ để nhận giá", prompt)
+        self.assertNotIn("68.000.000 đồng", prompt)
+
+    def test_license_plate_is_masked_when_requested(self):
+        prompt = motorcycle_sales.build_sales_script_prompt(self.listing)
+
+        self.assertIn("Biển số: 76-B1 ***.**", prompt)
+        self.assertNotIn("76-B1 123.45", prompt)
+
+    def test_license_plate_is_omitted_when_blank(self):
+        listing = self.listing.model_copy(update={"license_plate": " "})
+
+        prompt = motorcycle_sales.build_sales_script_prompt(listing)
+
+        self.assertNotIn("Biển số:", prompt)
+
+    def test_license_plate_is_shown_when_masking_is_disabled(self):
+        listing = self.listing.model_copy(update={"mask_license_plate": False})
+
+        prompt = motorcycle_sales.build_sales_script_prompt(listing)
+
+        self.assertIn("Biển số: 76-B1 123.45", prompt)
+
+    def test_notes_are_labeled_as_confirmed_supplemental_information(self):
+        listing = self.listing.model_copy(
+            update={"notes": "Đã thay lốp trước tháng 5/2026"}
+        )
+
+        prompt = motorcycle_sales.build_sales_script_prompt(listing)
+
+        self.assertIn(
+            "Thông tin bổ sung đã xác nhận: Đã thay lốp trước tháng 5/2026",
+            prompt,
+        )
+
+    def test_audit_flags_unsupported_claims_and_missing_cta(self):
+        issues = motorcycle_sales.audit_sales_script(
+            "Xe ZIN ĐÉT, ODO chuẩn, nhanh tay thì còn!",
+            self.listing,
+        )
+
+        self.assertIn("unsupported_claim:zin đét", issues)
+        self.assertIn("unsupported_claim:odo chuẩn", issues)
+        self.assertIn("missing_phone", issues)
+        self.assertIn("missing_address", issues)
+        self.assertIn("missing_store_name", issues)
+        self.assertIn("missing_legal_documents", issues)
+
+    def test_audit_allows_claim_explicitly_confirmed_in_notes(self):
+        listing = self.listing.model_copy(update={"notes": "Xe zin đét đã xác nhận"})
+        script = self._valid_script(
+            listing,
+            extra="Xe zin đét theo thông tin bổ sung đã xác nhận.",
+        )
+
+        issues = motorcycle_sales.audit_sales_script(script, listing)
+
+        self.assertNotIn("unsupported_claim:zin đét", issues)
+
+    def test_audit_accepts_practical_valid_cta_and_legal_trust_point(self):
+        script = self._valid_script(self.listing)
+
+        self.assertEqual(
+            motorcycle_sales.audit_sales_script(script, self.listing),
+            [],
+        )
+
+    def test_audit_uses_whitespace_insensitive_phone_and_key_address(self):
+        script = self._valid_script(self.listing).replace(
+            "0902 143 241",
+            "0902143241",
+        ).replace(
+            "08 Quang Trung, TP. Quảng Ngãi",
+            "08 Quang Trung",
+        )
+
+        issues = motorcycle_sales.audit_sales_script(script, self.listing)
+
+        self.assertNotIn("missing_phone", issues)
+        self.assertNotIn("missing_address", issues)
+
+    def test_audit_reports_word_count_outside_target_range(self):
+        issues = motorcycle_sales.audit_sales_script(
+            "Minh Dũng hồ sơ 08 Quang Trung 0902143241",
+            self.listing,
+        )
+
+        self.assertIn("word_count:8", issues)
+
+    def _valid_script(
+        self,
+        listing: UsedMotorcycleListing,
+        extra: str = "",
+    ) -> str:
+        required = (
+            f"{listing.store_name} giới thiệu xe với {listing.legal_documents}. "
+            f"Liên hệ {listing.phone} tại {listing.address}. {extra}"
+        )
+        filler_count = motorcycle_sales.TARGET_MIN_WORDS - len(required.split())
+        return required + " " + " ".join(["xe"] * filler_count)
+
+
+class TestMotorcycleSalesPreset(unittest.TestCase):
+    def test_video_subject_uses_listing_store(self):
+        listing = UsedMotorcycleListing(
+            name="Air Blade",
+            model_year="2021",
+            condition="Máy êm",
+            highlights=["Ngoại hình gọn"],
+            store_name="Minh Dũng",
+        )
+
+        self.assertEqual(
+            motorcycle_sales.build_video_subject(listing),
+            "Bán Air Blade đời 2021 tại Minh Dũng Quảng Ngãi",
+        )
+
+    def test_sales_defaults_match_vertical_ordered_local_video(self):
+        self.assertEqual(
+            motorcycle_sales.sales_video_defaults(),
+            {
+                "video_aspect": "9:16",
+                "video_source": "local",
+                "video_concat_mode": "sequential",
+                "video_clip_duration": 3,
+                "voice_rate": 1.1,
+            },
+        )
+
+    def test_social_context_contains_subject_store_contact_and_legal_documents(self):
+        listing = UsedMotorcycleListing(
+            name="Air Blade",
+            model_year="2021",
+            condition="Máy êm",
+            highlights=["Ngoại hình gọn"],
+        )
+
+        context = motorcycle_sales.build_social_context(listing)
+
+        self.assertIn("Bán Air Blade đời 2021 tại Minh Dũng Quảng Ngãi", context)
+        self.assertIn(listing.legal_documents, context)
+        self.assertIn(listing.store_name, context)
+        self.assertIn(listing.phone, context)
+        self.assertIn(listing.address, context)
 
 
 if __name__ == "__main__":
