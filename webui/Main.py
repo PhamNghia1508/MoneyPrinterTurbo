@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 
 import streamlit as st
 from loguru import logger
+from pydantic import ValidationError
 
 # Add the root directory of the project to the system path to allow importing modules from the project
 root_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -15,6 +16,11 @@ if root_dir not in sys.path:
     print("")
 
 from app.config import config
+from app.models.motorcycle import (
+    OdometerDisclosure,
+    PriceDisclosure,
+    UsedMotorcycleListing,
+)
 from app.models.schema import (
     MaterialInfo,
     VideoAspect,
@@ -23,6 +29,7 @@ from app.models.schema import (
     VideoTransitionMode,
 )
 from app.services import llm, voice
+from app.services import motorcycle_sales
 from app.services import task as tm
 from app.utils import utils
 
@@ -75,6 +82,20 @@ if "ui_language" not in st.session_state:
 if "local_video_materials" not in st.session_state:
     # 记住用户最近一次已经落盘的本地素材，避免仅修改文案后二次生成时丢失素材列表。
     st.session_state["local_video_materials"] = []
+if "content_mode" not in st.session_state:
+    st.session_state["content_mode"] = "motorcycle_sales"
+if "sales_script_warnings" not in st.session_state:
+    st.session_state["sales_script_warnings"] = []
+if "sales_listing_data" not in st.session_state:
+    st.session_state["sales_listing_data"] = None
+if "tiktok_metadata" not in st.session_state:
+    st.session_state["tiktok_metadata"] = {"title": "", "caption": "", "hashtags": []}
+if "facebook_metadata" not in st.session_state:
+    st.session_state["facebook_metadata"] = {
+        "title": "",
+        "caption": "",
+        "hashtags": [],
+    }
 
 # 加载语言文件
 locales = utils.load_locales(i18n_dir)
@@ -215,6 +236,43 @@ locales = utils.load_locales(i18n_dir)
 def tr(key):
     loc = locales.get(st.session_state["ui_language"], {})
     return loc.get("Translation", {}).get(key, key)
+
+
+SALES_MODE = "motorcycle_sales"
+GENERIC_MODE = "generic"
+
+
+def is_sales_mode():
+    return st.session_state.get("content_mode") == SALES_MODE
+
+
+def get_brand_default(config_key, fallback):
+    return (config.app.get(config_key) or fallback).strip()
+
+
+def get_sales_listing_from_state():
+    data = st.session_state.get("sales_listing_data")
+    if not data:
+        return None
+    try:
+        return UsedMotorcycleListing(**data)
+    except ValidationError:
+        return None
+
+
+def display_sales_warnings(warnings):
+    for warning in warnings:
+        if warning.startswith("word_count:"):
+            st.warning(f"{tr('Script Warning')}: {warning}")
+        else:
+            st.error(f"{tr('Script Warning')}: {warning}")
+
+
+def metadata_hashtag_text(metadata):
+    hashtags = metadata.get("hashtags", [])
+    if isinstance(hashtags, list):
+        return " ".join(hashtags)
+    return str(hashtags or "")
 
 
 # 创建基础设置折叠框
@@ -573,6 +631,22 @@ if not config.app.get("hide_config", False):
             save_keys_to_config("pixabay_api_keys", pixabay_api_key)
 
 llm_provider = config.app.get("llm_provider", "").lower()
+content_mode_options = [SALES_MODE, GENERIC_MODE]
+mode_labels = {
+    SALES_MODE: tr("Minh Dung Motorcycle Sales"),
+    GENERIC_MODE: tr("Generic Video"),
+}
+saved_content_mode = st.session_state.get("content_mode", SALES_MODE)
+if saved_content_mode not in content_mode_options:
+    saved_content_mode = SALES_MODE
+st.selectbox(
+    tr("Content Mode"),
+    options=content_mode_options,
+    format_func=lambda value: mode_labels[value],
+    index=content_mode_options.index(saved_content_mode),
+    key="content_mode",
+)
+
 panel = st.columns(3)
 left_panel = panel[0]
 middle_panel = panel[1]
@@ -584,100 +658,285 @@ uploaded_audio_file = None
 
 with left_panel:
     with st.container(border=True):
-        st.write(tr("Video Script Settings"))
-        params.video_subject = st.text_input(
-            tr("Video Subject"),
-            key="video_subject",
-        ).strip()
+        if is_sales_mode():
+            st.write(tr("Motorcycle Sales Settings"))
+            params.video_language = "vi-VN"
+            params.paragraph_number = 1
 
-        video_languages = [
-            (tr("Auto Detect"), ""),
-        ]
-        for code in support_locales:
-            video_languages.append((code, code))
-
-        selected_index = st.selectbox(
-            tr("Script Language"),
-            index=0,
-            options=range(
-                len(video_languages)
-            ),  # Use the index as the internal option value
-            format_func=lambda x: video_languages[x][
-                0
-            ],  # The label is displayed to the user
-        )
-        params.video_language = video_languages[selected_index][1]
-
-        with st.expander(tr("Advanced Script Settings"), expanded=False):
-            params.paragraph_number = st.slider(
-                tr("Script Paragraph Number"),
-                min_value=llm.MIN_SCRIPT_PARAGRAPH_NUMBER,
-                max_value=llm.MAX_SCRIPT_PARAGRAPH_NUMBER,
-                value=st.session_state.get("paragraph_number_input", 1),
-                key="paragraph_number_input",
+            vehicle_name = st.text_input(tr("Vehicle Name"), key="sales_vehicle_name")
+            model_year = st.text_input(tr("Model Year"), key="sales_model_year")
+            odometer_options = [
+                (tr("Odometer Not Verified"), OdometerDisclosure.not_verified),
+                (tr("Odometer Verified"), OdometerDisclosure.verified),
+                (tr("Hide Odometer"), OdometerDisclosure.hidden),
+            ]
+            selected_odometer_index = st.selectbox(
+                tr("Odometer Disclosure"),
+                options=range(len(odometer_options)),
+                format_func=lambda x: odometer_options[x][0],
+                key="sales_odometer_disclosure",
             )
-            params.video_script_prompt = st.text_area(
-                tr("Custom Script Requirements"),
-                height=100,
-                max_chars=llm.MAX_SCRIPT_PROMPT_LENGTH,
-                placeholder=tr("Custom Script Requirements Placeholder"),
-                key="video_script_prompt",
+            odometer_disclosure = odometer_options[selected_odometer_index][1]
+            odometer_km = None
+            if odometer_disclosure == OdometerDisclosure.verified:
+                odometer_km = st.number_input(
+                    tr("Odometer KM"),
+                    min_value=0,
+                    max_value=2_000_000,
+                    value=0,
+                    step=100,
+                    key="sales_odometer_km",
+                )
+
+            license_plate = st.text_input(
+                tr("License Plate"), key="sales_license_plate"
+            )
+            mask_license_plate = st.checkbox(
+                tr("Mask License Plate"),
+                value=True,
+                key="sales_mask_license_plate",
+            )
+
+            price_options = [
+                (tr("Contact For Price"), PriceDisclosure.contact),
+                (tr("Public Price"), PriceDisclosure.public),
+            ]
+            selected_price_index = st.selectbox(
+                tr("Price Disclosure"),
+                options=range(len(price_options)),
+                format_func=lambda x: price_options[x][0],
+                key="sales_price_disclosure",
+            )
+            price_disclosure = price_options[selected_price_index][1]
+            price = None
+            if price_disclosure == PriceDisclosure.public:
+                price = st.number_input(
+                    tr("Sale Price VND"),
+                    min_value=0,
+                    value=0,
+                    step=100_000,
+                    key="sales_price",
+                )
+
+            condition = st.text_area(
+                tr("Actual Condition"),
+                height=90,
+                key="sales_condition",
+            )
+            highlights_text = st.text_area(
+                tr("Vehicle Highlights"),
+                height=90,
+                help=tr("One highlight per line"),
+                key="sales_highlights",
+            )
+            legal_documents = st.text_input(
+                tr("Legal Documents"),
+                value=get_brand_default(
+                    "motorcycle_legal_documents",
+                    "Hồ sơ pháp lý đầy đủ, hỗ trợ sang tên",
+                ),
+                key="sales_legal_documents",
+            )
+            notes = st.text_area(
+                tr("Additional Verified Notes"),
+                height=80,
+                key="sales_notes",
+            )
+
+            if st.button(tr("Generate Motorcycle Sales Script"), key="generate_sales_script"):
+                try:
+                    listing = UsedMotorcycleListing(
+                        name=vehicle_name,
+                        model_year=model_year,
+                        odometer_km=odometer_km
+                        if odometer_disclosure == OdometerDisclosure.verified
+                        else None,
+                        odometer_disclosure=odometer_disclosure,
+                        license_plate=license_plate,
+                        mask_license_plate=mask_license_plate,
+                        price=price if price_disclosure == PriceDisclosure.public else None,
+                        price_disclosure=price_disclosure,
+                        condition=condition,
+                        highlights=highlights_text.splitlines(),
+                        legal_documents=legal_documents,
+                        notes=notes,
+                        store_name=get_brand_default(
+                            "motorcycle_store_name", motorcycle_sales.STORE_NAME
+                        ),
+                        phone=get_brand_default(
+                            "motorcycle_store_phone", motorcycle_sales.STORE_PHONE
+                        ),
+                        address=get_brand_default(
+                            "motorcycle_store_address",
+                            motorcycle_sales.STORE_ADDRESS,
+                        ),
+                    )
+                except ValidationError as e:
+                    st.error(f"{tr('Please complete required motorcycle fields')}: {e}")
+                else:
+                    with st.spinner(tr("Generating Motorcycle Sales Script")):
+                        result = llm.generate_motorcycle_sales_script(listing)
+                    if result["script"].startswith("Error: "):
+                        st.error(result["script"])
+                    else:
+                        st.session_state["sales_listing_data"] = listing.model_dump(
+                            mode="json"
+                        )
+                        st.session_state["video_subject"] = (
+                            motorcycle_sales.build_video_subject(listing)
+                        )
+                        st.session_state["video_script"] = result["script"]
+                        st.session_state["video_terms"] = ""
+                        st.session_state["sales_script_warnings"] = result["warnings"]
+                        social_subject = motorcycle_sales.build_social_context(listing)
+                        st.session_state["tiktok_metadata"] = (
+                            llm.generate_social_metadata(
+                                video_subject=social_subject,
+                                video_script=result["script"],
+                                language="vi-VN",
+                                platform="tiktok",
+                            )
+                        )
+                        st.session_state["facebook_metadata"] = (
+                            llm.generate_social_metadata(
+                                video_subject=social_subject,
+                                video_script=result["script"],
+                                language="vi-VN",
+                                platform="facebook_reels",
+                            )
+                        )
+
+            params.video_subject = st.session_state.get("video_subject", "")
+            if st.session_state["sales_script_warnings"]:
+                display_sales_warnings(st.session_state["sales_script_warnings"])
+
+            params.video_script = st.text_area(
+                tr("Video Script"),
+                value=st.session_state["video_script"],
+                height=280,
+            )
+            st.session_state["video_script"] = params.video_script
+            params.video_terms = ""
+
+            st.write(tr("Social Metadata Drafts"))
+            for label, state_key in (
+                ("TikTok", "tiktok_metadata"),
+                ("Facebook Reels", "facebook_metadata"),
+            ):
+                metadata = st.session_state[state_key]
+                with st.expander(label, expanded=False):
+                    metadata["title"] = st.text_input(
+                        f"{label} {tr('Title')}",
+                        value=metadata.get("title", ""),
+                        key=f"{state_key}_title",
+                    )
+                    metadata["caption"] = st.text_area(
+                        f"{label} {tr('Caption')}",
+                        value=metadata.get("caption", ""),
+                        key=f"{state_key}_caption",
+                    )
+                    hashtags_text = st.text_area(
+                        f"{label} {tr('Hashtags')}",
+                        value=metadata_hashtag_text(metadata),
+                        key=f"{state_key}_hashtags",
+                    )
+                    metadata["hashtags"] = [
+                        tag.strip()
+                        for tag in hashtags_text.replace(",", " ").split()
+                        if tag.strip()
+                    ]
+                    st.session_state[state_key] = metadata
+        else:
+            st.write(tr("Video Script Settings"))
+            params.video_subject = st.text_input(
+                tr("Video Subject"),
+                key="video_subject",
             ).strip()
 
-            use_custom_system_prompt = st.checkbox(
-                tr("Use Custom System Prompt"),
-                help=tr("Use Custom System Prompt Help"),
-                key="use_custom_system_prompt",
+            video_languages = [
+                (tr("Auto Detect"), ""),
+            ]
+            for code in support_locales:
+                video_languages.append((code, code))
+
+            selected_index = st.selectbox(
+                tr("Script Language"),
+                index=0,
+                options=range(len(video_languages)),
+                format_func=lambda x: video_languages[x][0],
             )
+            params.video_language = video_languages[selected_index][1]
 
-            if use_custom_system_prompt:
-                custom_system_prompt = st.text_area(
-                    tr("Custom System Prompt"),
-                    height=240,
-                    max_chars=llm.MAX_SCRIPT_SYSTEM_PROMPT_LENGTH,
-                    key="custom_system_prompt",
-                ).strip()
-                params.custom_system_prompt = custom_system_prompt
-            else:
-                params.custom_system_prompt = ""
-
-        if st.button(
-            tr("Generate Video Script and Keywords"), key="auto_generate_script"
-        ):
-            with st.spinner(tr("Generating Video Script and Keywords")):
-                script = llm.generate_script(
-                    video_subject=params.video_subject,
-                    language=params.video_language,
-                    paragraph_number=params.paragraph_number,
-                    video_script_prompt=params.video_script_prompt,
-                    custom_system_prompt=params.custom_system_prompt,
+            with st.expander(tr("Advanced Script Settings"), expanded=False):
+                params.paragraph_number = st.slider(
+                    tr("Script Paragraph Number"),
+                    min_value=llm.MIN_SCRIPT_PARAGRAPH_NUMBER,
+                    max_value=llm.MAX_SCRIPT_PARAGRAPH_NUMBER,
+                    value=st.session_state.get("paragraph_number_input", 1),
+                    key="paragraph_number_input",
                 )
-                terms = llm.generate_terms(params.video_subject, script)
-                if "Error: " in script:
-                    st.error(tr(script))
-                elif "Error: " in terms:
-                    st.error(tr(terms))
-                else:
-                    st.session_state["video_script"] = script
-                    st.session_state["video_terms"] = ", ".join(terms)
-        params.video_script = st.text_area(
-            tr("Video Script"), value=st.session_state["video_script"], height=280
-        )
-        if st.button(tr("Generate Video Keywords"), key="auto_generate_terms"):
-            if not params.video_script:
-                st.error(tr("Please Enter the Video Subject"))
-                st.stop()
+                params.video_script_prompt = st.text_area(
+                    tr("Custom Script Requirements"),
+                    height=100,
+                    max_chars=llm.MAX_SCRIPT_PROMPT_LENGTH,
+                    placeholder=tr("Custom Script Requirements Placeholder"),
+                    key="video_script_prompt",
+                ).strip()
 
-            with st.spinner(tr("Generating Video Keywords")):
-                terms = llm.generate_terms(params.video_subject, params.video_script)
-                if "Error: " in terms:
-                    st.error(tr(terms))
-                else:
-                    st.session_state["video_terms"] = ", ".join(terms)
+                use_custom_system_prompt = st.checkbox(
+                    tr("Use Custom System Prompt"),
+                    help=tr("Use Custom System Prompt Help"),
+                    key="use_custom_system_prompt",
+                )
 
-        params.video_terms = st.text_area(
-            tr("Video Keywords"), value=st.session_state["video_terms"]
-        )
+                if use_custom_system_prompt:
+                    custom_system_prompt = st.text_area(
+                        tr("Custom System Prompt"),
+                        height=240,
+                        max_chars=llm.MAX_SCRIPT_SYSTEM_PROMPT_LENGTH,
+                        key="custom_system_prompt",
+                    ).strip()
+                    params.custom_system_prompt = custom_system_prompt
+                else:
+                    params.custom_system_prompt = ""
+
+            if st.button(
+                tr("Generate Video Script and Keywords"), key="auto_generate_script"
+            ):
+                with st.spinner(tr("Generating Video Script and Keywords")):
+                    script = llm.generate_script(
+                        video_subject=params.video_subject,
+                        language=params.video_language,
+                        paragraph_number=params.paragraph_number,
+                        video_script_prompt=params.video_script_prompt,
+                        custom_system_prompt=params.custom_system_prompt,
+                    )
+                    terms = llm.generate_terms(params.video_subject, script)
+                    if "Error: " in script:
+                        st.error(tr(script))
+                    elif "Error: " in terms:
+                        st.error(tr(terms))
+                    else:
+                        st.session_state["video_script"] = script
+                        st.session_state["video_terms"] = ", ".join(terms)
+            params.video_script = st.text_area(
+                tr("Video Script"), value=st.session_state["video_script"], height=280
+            )
+            if st.button(tr("Generate Video Keywords"), key="auto_generate_terms"):
+                if not params.video_script:
+                    st.error(tr("Please Enter the Video Subject"))
+                    st.stop()
+
+                with st.spinner(tr("Generating Video Keywords")):
+                    terms = llm.generate_terms(params.video_subject, params.video_script)
+                    if "Error: " in terms:
+                        st.error(tr(terms))
+                    else:
+                        st.session_state["video_terms"] = ", ".join(terms)
+
+            params.video_terms = st.text_area(
+                tr("Video Keywords"), value=st.session_state["video_terms"]
+            )
 
 with middle_panel:
     with st.container(border=True):
@@ -686,51 +945,77 @@ with middle_panel:
             (tr("Sequential"), "sequential"),
             (tr("Random"), "random"),
         ]
-        video_sources = [
-            (tr("Pexels"), "pexels"),
-            (tr("Pixabay"), "pixabay"),
-            (tr("Local file"), "local"),
-            (tr("TikTok"), "douyin"),
-            (tr("Bilibili"), "bilibili"),
-            (tr("Xiaohongshu"), "xiaohongshu"),
-        ]
-
-        saved_video_source_name = config.app.get("video_source", "local")
-        saved_video_source_index = [v[1] for v in video_sources].index(
-            saved_video_source_name
-        )
-
-        selected_index = st.selectbox(
-            tr("Video Source"),
-            options=range(len(video_sources)),
-            format_func=lambda x: video_sources[x][0],
-            index=saved_video_source_index,
-        )
-        params.video_source = video_sources[selected_index][1]
-        config.app["video_source"] = params.video_source
-
-        if params.video_source == "local":
-            # Streamlit 的文件类型校验对扩展名大小写敏感，这里同时放行大小写两种形式。
+        if is_sales_mode():
+            sales_defaults = motorcycle_sales.sales_video_defaults()
+            params.video_source = sales_defaults["video_source"]
+            params.video_concat_mode = VideoConcatMode(
+                sales_defaults["video_concat_mode"]
+            )
+            params.video_aspect = VideoAspect(sales_defaults["video_aspect"])
+            params.video_clip_duration = sales_defaults["video_clip_duration"]
+            params.video_count = 1
+            config.app["video_source"] = params.video_source
+            st.info(tr("Motorcycle Sales Video Defaults"))
             local_file_types = ["mp4", "mov", "avi", "flv", "mkv", "jpg", "jpeg", "png"]
             uploaded_files = st.file_uploader(
-                "Upload Local Files",
-                type=local_file_types + [file_type.upper() for file_type in local_file_types],
+                tr("Upload Motorcycle Media"),
+                type=local_file_types
+                + [file_type.upper() for file_type in local_file_types],
                 accept_multiple_files=True,
+                help=tr("First Upload Hook Help"),
+            )
+        else:
+            video_sources = [
+                (tr("Pexels"), "pexels"),
+                (tr("Pixabay"), "pixabay"),
+                (tr("Local file"), "local"),
+                (tr("TikTok"), "douyin"),
+                (tr("Bilibili"), "bilibili"),
+                (tr("Xiaohongshu"), "xiaohongshu"),
+            ]
+
+            saved_video_source_name = config.app.get("video_source", "local")
+            saved_video_source_index = [v[1] for v in video_sources].index(
+                saved_video_source_name
             )
 
-        selected_index = st.selectbox(
-            tr("Video Concat Mode"),
-            index=1,
-            options=range(
-                len(video_concat_modes)
-            ),  # Use the index as the internal option value
-            format_func=lambda x: video_concat_modes[x][
-                0
-            ],  # The label is displayed to the user
-        )
-        params.video_concat_mode = VideoConcatMode(
-            video_concat_modes[selected_index][1]
-        )
+            selected_index = st.selectbox(
+                tr("Video Source"),
+                options=range(len(video_sources)),
+                format_func=lambda x: video_sources[x][0],
+                index=saved_video_source_index,
+            )
+            params.video_source = video_sources[selected_index][1]
+            config.app["video_source"] = params.video_source
+
+            if params.video_source == "local":
+                # Streamlit 的文件类型校验对扩展名大小写敏感，这里同时放行大小写两种形式。
+                local_file_types = [
+                    "mp4",
+                    "mov",
+                    "avi",
+                    "flv",
+                    "mkv",
+                    "jpg",
+                    "jpeg",
+                    "png",
+                ]
+                uploaded_files = st.file_uploader(
+                    "Upload Local Files",
+                    type=local_file_types
+                    + [file_type.upper() for file_type in local_file_types],
+                    accept_multiple_files=True,
+                )
+
+            selected_index = st.selectbox(
+                tr("Video Concat Mode"),
+                index=1,
+                options=range(len(video_concat_modes)),
+                format_func=lambda x: video_concat_modes[x][0],
+            )
+            params.video_concat_mode = VideoConcatMode(
+                video_concat_modes[selected_index][1]
+            )
 
         # 视频转场模式
         video_transition_modes = [
@@ -751,29 +1036,26 @@ with middle_panel:
             video_transition_modes[selected_index][1]
         )
 
-        video_aspect_ratios = [
-            (tr("Portrait"), VideoAspect.portrait.value),
-            (tr("Landscape"), VideoAspect.landscape.value),
-        ]
-        selected_index = st.selectbox(
-            tr("Video Ratio"),
-            options=range(
-                len(video_aspect_ratios)
-            ),  # Use the index as the internal option value
-            format_func=lambda x: video_aspect_ratios[x][
-                0
-            ],  # The label is displayed to the user
-        )
-        params.video_aspect = VideoAspect(video_aspect_ratios[selected_index][1])
+        if not is_sales_mode():
+            video_aspect_ratios = [
+                (tr("Portrait"), VideoAspect.portrait.value),
+                (tr("Landscape"), VideoAspect.landscape.value),
+            ]
+            selected_index = st.selectbox(
+                tr("Video Ratio"),
+                options=range(len(video_aspect_ratios)),
+                format_func=lambda x: video_aspect_ratios[x][0],
+            )
+            params.video_aspect = VideoAspect(video_aspect_ratios[selected_index][1])
 
-        params.video_clip_duration = st.selectbox(
-            tr("Clip Duration"), options=[2, 3, 4, 5, 6, 7, 8, 9, 10], index=1
-        )
-        params.video_count = st.selectbox(
-            tr("Number of Videos Generated Simultaneously"),
-            options=[1, 2, 3, 4, 5],
-            index=0,
-        )
+            params.video_clip_duration = st.selectbox(
+                tr("Clip Duration"), options=[2, 3, 4, 5, 6, 7, 8, 9, 10], index=1
+            )
+            params.video_count = st.selectbox(
+                tr("Number of Videos Generated Simultaneously"),
+                options=[1, 2, 3, 4, 5],
+                index=0,
+            )
 
         with st.expander(tr("Advanced Video Settings"), expanded=False):
             video_codec_options = [
@@ -1263,6 +1545,24 @@ start_button = st.button(tr("Generate Video"), use_container_width=True, type="p
 if start_button:
     config.save_config()
     task_id = str(uuid4())
+    sales_listing = None
+    if is_sales_mode():
+        sales_listing = get_sales_listing_from_state()
+        if sales_listing is None:
+            st.error(tr("Please generate a motorcycle sales script first"))
+            scroll_to_bottom()
+            st.stop()
+        params.video_subject = motorcycle_sales.build_video_subject(sales_listing)
+        params.video_script = st.session_state.get("video_script", "").strip()
+        params.video_language = "vi-VN"
+        params.video_terms = ""
+        params.video_source = "local"
+        params.video_concat_mode = VideoConcatMode.sequential
+        params.video_aspect = VideoAspect.portrait
+        params.video_clip_duration = 3
+        params.video_count = 1
+        params.voice_rate = motorcycle_sales.sales_video_defaults()["voice_rate"]
+
     if not params.video_subject and not params.video_script:
         st.error(tr("Video Script and Subject Cannot Both Be Empty"))
         scroll_to_bottom()
@@ -1326,6 +1626,39 @@ if start_button:
             m.duration = material.get("duration", 0)
             if m.url:
                 params.video_materials.append(m)
+
+    if is_sales_mode():
+        if not params.video_materials:
+            st.error(tr("Please upload at least one motorcycle photo or video"))
+            scroll_to_bottom()
+            st.stop()
+
+        warnings = motorcycle_sales.audit_sales_script(
+            params.video_script, sales_listing
+        )
+        st.session_state["sales_script_warnings"] = warnings
+        blocking_warning_prefixes = (
+            "unsupported_claim:",
+            "missing_phone",
+            "missing_address",
+            "missing_store_name",
+            "missing_legal_documents",
+            "unexpected_price_disclosure",
+            "missing_public_price",
+            "unexpected_odometer_claim",
+            "missing_verified_odometer",
+        )
+        blocking_warnings = [
+            warning
+            for warning in warnings
+            if warning.startswith(blocking_warning_prefixes)
+        ]
+        if blocking_warnings:
+            display_sales_warnings(blocking_warnings)
+            scroll_to_bottom()
+            st.stop()
+        if warnings:
+            display_sales_warnings(warnings)
 
     log_container = st.empty()
     log_records = []

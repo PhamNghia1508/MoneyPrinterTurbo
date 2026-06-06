@@ -15,6 +15,12 @@ edge_tts_timeout = 30
 # 只有在企业代理或自签证书环境明确需要时，才临时改为 false。
 tls_verify = true
 
+# Optional motorcycle-sales brand defaults used by the Streamlit preset.
+motorcycle_store_name = "Minh Dũng"
+motorcycle_store_phone = "0902 143 241"
+motorcycle_store_address = "08 Quang Trung, TP. Quảng Ngãi"
+motorcycle_legal_documents = "Hồ sơ pháp lý đầy đủ, hỗ trợ sang tên"
+
 # Pexels API Key
 # Register at https://www.pexels.com/api/ to get your API key.
 # You can use multiple keys to avoid rate limits.
