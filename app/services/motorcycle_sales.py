@@ -239,6 +239,39 @@ def audit_sales_script(
     return issues
 
 
+def ensure_required_sales_facts(
+    script: str,
+    listing: UsedMotorcycleListing,
+) -> str:
+    issues = audit_sales_script(script, listing)
+    required_additions = []
+
+    if "missing_public_price" in issues:
+        required_additions.append(f"Giá bán công khai {format_vnd(listing.price)}.")
+
+    if "missing_verified_odometer" in issues:
+        required_additions.append(
+            f"ODO {_format_number(listing.odometer_km)} km đã xác minh."
+        )
+
+    if "missing_legal_documents" in issues:
+        required_additions.append(f"Hồ sơ pháp lý: {listing.legal_documents}.")
+
+    if any(
+        issue in issues
+        for issue in ("missing_store_name", "missing_phone", "missing_address")
+    ):
+        required_additions.append(
+            f"Liên hệ {listing.store_name} qua số {listing.phone}, "
+            f"địa chỉ {listing.address} để xem xe và chạy thử."
+        )
+
+    if not required_additions:
+        return script.strip()
+
+    return f"{script.strip()}\n\n{' '.join(required_additions)}".strip()
+
+
 def _address_locality(address: str) -> str:
     locality = address.rsplit(",", maxsplit=1)[-1].strip() or address.strip()
     cleaned = re.sub(

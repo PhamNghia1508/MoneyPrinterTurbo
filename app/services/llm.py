@@ -693,6 +693,9 @@ def generate_motorcycle_sales_script(listing: UsedMotorcycleListing) -> dict:
             script = _generate_response(prompt)
             if script and "Error: " not in script:
                 cleaned_script = script.replace("*", "").replace("#", "").strip()
+                cleaned_script = motorcycle_sales.ensure_required_sales_facts(
+                    cleaned_script, listing
+                )
                 return {
                     "script": cleaned_script,
                     "warnings": motorcycle_sales.audit_sales_script(

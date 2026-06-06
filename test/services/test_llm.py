@@ -156,6 +156,37 @@ class TestMotorcycleSalesScriptGeneration(unittest.TestCase):
         self.assertNotIn("*", result["script"])
         self.assertNotIn("#", result["script"])
 
+    def test_generate_sales_script_appends_required_sales_facts_when_model_omits_them(self):
+        listing = UsedMotorcycleListing(
+            name="Honda Vision",
+            model_year="2018",
+            condition="Xe cu, may no on, de nhe",
+            highlights=["Tiet kiem xang", "Ho so day du"],
+            legal_documents="Ho so phap ly day du, ho tro sang ten theo quy dinh.",
+            price_disclosure=PriceDisclosure.public,
+            price=7000000,
+            odometer_disclosure=OdometerDisclosure.verified,
+            odometer_km=10000,
+            store_name="Minh Dung",
+            phone="0902 143 241",
+            address="08 Quang Trung, TP. Quang Ngai",
+        )
+        response = "Honda Vision 2018 dang gon, di pho nhe nhang, phu hop di lam hang ngay."
+
+        with patch.object(llm, "_generate_response", return_value=response):
+            result = llm.generate_motorcycle_sales_script(listing)
+
+        self.assertIn("7.000.000 đồng", result["script"])
+        self.assertIn("ODO 10.000 km đã xác minh", result["script"])
+        self.assertIn("Minh Dung", result["script"])
+        self.assertIn("0902 143 241", result["script"])
+        self.assertIn("08 Quang Trung", result["script"])
+        self.assertNotIn("missing_public_price", result["warnings"])
+        self.assertNotIn("missing_verified_odometer", result["warnings"])
+        self.assertNotIn("missing_phone", result["warnings"])
+        self.assertNotIn("missing_address", result["warnings"])
+        self.assertNotIn("missing_store_name", result["warnings"])
+
     def test_generate_sales_script_returns_diagnostic_error_after_retries(self):
         with patch.object(llm, "_generate_response", return_value="Error: api_key is not set"):
             result = llm.generate_motorcycle_sales_script(self.listing)
