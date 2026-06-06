@@ -695,7 +695,7 @@ with middle_panel:
             (tr("Xiaohongshu"), "xiaohongshu"),
         ]
 
-        saved_video_source_name = config.app.get("video_source", "pexels")
+        saved_video_source_name = config.app.get("video_source", "local")
         saved_video_source_index = [v[1] for v in video_sources].index(
             saved_video_source_name
         )
