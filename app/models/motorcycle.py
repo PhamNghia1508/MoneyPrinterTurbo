@@ -26,11 +26,19 @@ class UsedMotorcycleListing(BaseModel):
     price_disclosure: PriceDisclosure = PriceDisclosure.contact
     condition: str = Field(min_length=1, max_length=1000)
     highlights: list[str] = Field(min_length=1, max_length=10)
-    legal_documents: str = "Hồ sơ pháp lý đầy đủ, hỗ trợ sang tên"
+    legal_documents: str = Field(
+        default="Hồ sơ pháp lý đầy đủ, hỗ trợ sang tên",
+        min_length=1,
+        max_length=500,
+    )
     notes: str = Field(default="", max_length=1000)
-    store_name: str = "Minh Dũng"
-    phone: str = "0902 143 241"
-    address: str = "08 Quang Trung, TP. Quảng Ngãi"
+    store_name: str = Field(default="Minh Dũng", min_length=1, max_length=120)
+    phone: str = Field(default="0902 143 241", min_length=1, max_length=40)
+    address: str = Field(
+        default="08 Quang Trung, TP. Quảng Ngãi",
+        min_length=1,
+        max_length=300,
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -39,7 +47,15 @@ class UsedMotorcycleListing(BaseModel):
             return data
 
         cleaned = data.copy()
-        for field_name in ("name", "model_year", "condition"):
+        for field_name in (
+            "name",
+            "model_year",
+            "condition",
+            "legal_documents",
+            "store_name",
+            "phone",
+            "address",
+        ):
             value = cleaned.get(field_name)
             if isinstance(value, str):
                 cleaned[field_name] = value.strip()
