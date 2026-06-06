@@ -1029,7 +1029,7 @@ with middle_panel:
         params.voice_rate = st.selectbox(
             tr("Speech Rate"),
             options=[0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.5, 1.8, 2.0],
-            index=2,
+            index=3,
         )
 
         custom_audio_file_types = ["mp3", "wav", "m4a", "aac", "flac", "ogg"]
@@ -1364,5 +1364,8 @@ if start_button:
     open_task_folder(task_id)
     logger.info(tr("Video Generation Completed"))
     scroll_to_bottom()
+
+config.save_config()
+_bottom()
 
 config.save_config()

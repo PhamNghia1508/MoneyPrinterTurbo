@@ -1,0 +1,183 @@
+2026-06-06 03:35:30.069 | INFO     | __main__:<module>:1343 - Bắt Đầu Tạo Video
+
+2026-06-06 03:35:30.071 | INFO     | __main__:<module>:1344 - {
+    "video_subject": "Review Honda SH 150i nhập Ý đời 2012 số máy 111 trắng sporty zin nguyên bản",
+    "video_script": "Đây là siêu phẩm Honda SH 150i nhập Ý đời 2012, số máy 111, màu trắng sporty zin nguyên bản hiếm có. Một chiếc xe không chỉ là phương tiện di chuyển mà còn là biểu tượng của sự đẳng cấp và phong cách, đặc biệt với chất lượng xe nhập Ý.Động cơ 150i mạnh mẽ, bền bỉ đặc trưng của dòng xe Ý, cho cảm giác lái cực kỳ êm ái, bốc và đầm chắc trên mọi cung đường. Thiết kế trắng sporty vẫn giữ được nét sang trọng, tinh tế và không hề lỗi thời, khẳng định cá tính của chủ nhân.Chiếc xe này cam kết máy chưa rớt đầu, bao check gốc toàn quốc, đảm bảo anh em hoàn toàn yên tâm về chất lượng và pháp lý. Đây là cơ hội hiếm có để sở hữu một chiếc SH Ý zin nguyên bản, giá trị giữ giá cực tốt.Với mức giá chỉ 2xx triệu, bạn đã sở hữu ngay một huyền thoại SH 150i nhập Ý đẳng cấp. Cửa hàng còn hỗ trợ trả góp linh hoạt, thủ tục nhanh gọn. Đến ngay cửa hàng để trải nghiệm hoặc gọi hotline để nhận báo giá chi tiết!",
+    "video_terms": "Honda SH 150i, SH 150i riding, White SH 150i, SH 150i scooter, Honda SH review",
+    "video_aspect": "9:16",
+    "video_concat_mode": "random",
+    "video_transition_mode": "None",
+    "video_clip_duration": 4,
+    "video_count": 1,
+    "video_source": "local",
+    "video_materials": [
+        {
+            "provider": "local",
+            "url": "./storage/local_videos/db17ff87-8aff-4360-993a-62f4a46a592b_download (1).jpg",
+            "duration": 0
+        },
+        {
+            "provider": "local",
+            "url": "./storage/local_videos/532262a4-8399-40dc-aa7a-c78cd9ac4580_download (2).jpg",
+            "duration": 0
+        },
+        {
+            "provider": "local",
+            "url": "./storage/local_videos/5b953f7d-90b5-4688-af5a-d10ddd940a2b_download.jpg",
+            "duration": 0
+        },
+        {
+            "provider": "local",
+            "url": "./storage/local_videos/9d2e4fd0-562f-4af2-a13e-41f23e25ea14_sh_y_face.jpg",
+            "duration": 0
+        },
+        {
+            "provider": "local",
+            "url": "./storage/local_videos/31575ee9-9045-4976-a294-33c80ddf5636_sh150i-nhap-y-2012-757491-066759a9cc260d.png",
+            "duration": 0
+        }
+    ],
+    "custom_audio_file": null,
+    "video_language": "vi-VN",
+    "voice_name": "en-US-AndrewMultilingualNeural-Male",
+    "voice_volume": 1.0,
+    "voice_rate": 1.0,
+    "bgm_type": "random",
+    "bgm_file": "",
+    "bgm_volume": 0.2,
+    "subtitle_enabled": true,
+    "subtitle_position": "bottom",
+    "custom_position": 70.0,
+    "font_name": "MicrosoftYaHeiBold.ttc",
+    "text_fore_color": "#FFFFFF",
+    "text_background_color": "#000000",
+    "rounded_subtitle_background": false,
+    "font_size": 60,
+    "stroke_color": "#000000",
+    "stroke_width": 1.5,
+    "n_threads": 2,
+    "paragraph_number": 4,
+    "video_script_prompt": "Giá bán 2xx triệu, hỗ trợ trả góp, bao check gốc, máy chưa rớt đầu",
+    "custom_system_prompt": ""
+}
+
+2026-06-06 03:35:30.076 | INFO     | app.services.task:start:251 - start task: 85db15d9-c09d-4aee-89b2-0d13582f2185, stop_at: video
+
+2026-06-06 03:35:30.079 | INFO     | app.services.task:generate_script:17 - 
+
+## generating video script
+
+2026-06-06 03:35:30.080 | DEBUG    | app.services.task:generate_script:28 - video script: 
+Đây là siêu phẩm Honda SH 150i nhập Ý đời 2012, số máy 111, màu trắng sporty zin nguyên bản hiếm có. Một chiếc xe không chỉ là phương tiện di chuyển mà còn là biểu tượng của sự đẳng cấp và phong cách, đặc biệt với chất lượng xe nhập Ý.Động cơ 150i mạnh mẽ, bền bỉ đặc trưng của dòng xe Ý, cho cảm giác lái cực kỳ êm ái, bốc và đầm chắc trên mọi cung đường. Thiết kế trắng sporty vẫn giữ được nét sang trọng, tinh tế và không hề lỗi thời, khẳng định cá tính của chủ nhân.Chiếc xe này cam kết máy chưa rớt đầu, bao check gốc toàn quốc, đảm bảo anh em hoàn toàn yên tâm về chất lượng và pháp lý. Đây là cơ hội hiếm có để sở hữu một chiếc SH Ý zin nguyên bản, giá trị giữ giá cực tốt.Với mức giá chỉ 2xx triệu, bạn đã sở hữu ngay một huyền thoại SH 150i nhập Ý đẳng cấp. Cửa hàng còn hỗ trợ trả góp linh hoạt, thủ tục nhanh gọn. Đến ngay cửa hàng để trải nghiệm hoặc gọi hotline để nhận báo giá chi tiết!
+
+2026-06-06 03:35:30.083 | INFO     | app.services.task:generate_audio:86 - 
+
+## generating audio
+
+2026-06-06 03:35:30.085 | INFO     | app.services.task:generate_audio:96 - no custom audio file provided, using TTS to generate audio.
+
+2026-06-06 03:35:30.087 | INFO     | app.services.voice:azure_tts_v1:642 - start, voice name: en-US-AndrewMultilingualNeural, try: 1
+
+2026-06-06 03:35:42.956 | INFO     | app.services.voice:azure_tts_v1:671 - completed, output file: ./storage/tasks/b92e786f-a779-4d21-991e-61f8571c8dea/audio.mp3
+
+2026-06-06 03:35:44.135 | INFO     | app.services.voice:azure_tts_v1:671 - completed, output file: ./storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/audio.mp3
+
+2026-06-06 03:35:44.139 | INFO     | app.services.task:generate_subtitle:136 - 
+
+## generating subtitle
+
+2026-06-06 03:35:44.141 | INFO     | app.services.task:generate_subtitle:142 - 
+
+## generating subtitle, provider: edge
+
+2026-06-06 03:35:44.155 | INFO     | app.services.voice:_write_subtitle_items:1255 - completed, subtitle file created: ./storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/subtitle.srt, duration: 61.775
+
+2026-06-06 03:35:44.157 | INFO     | app.services.task:get_video_materials:168 - 
+
+## preprocess local materials
+
+2026-06-06 03:35:44.161 | WARNING  | app.services.video:preprocess_video:1043 - low resolution material: 194x259, minimum 480x480 required
+
+2026-06-06 03:35:44.322 | WARNING  | app.services.video:preprocess_video:1043 - low resolution material: 259x194, minimum 480x480 required
+
+2026-06-06 03:35:44.441 | WARNING  | app.services.video:preprocess_video:1043 - low resolution material: 194x259, minimum 480x480 required
+
+2026-06-06 03:35:44.578 | WARNING  | app.services.video:preprocess_video:1043 - low resolution material: 259x194, minimum 480x480 required
+
+2026-06-06 03:35:44.836 | INFO     | app.services.video:preprocess_video:1049 - processing image: ./storage/local_videos/31575ee9-9045-4976-a294-33c80ddf5636_sh150i-nhap-y-2012-757491-066759a9cc260d.png
+
+2026-06-06 03:37:10.438 | SUCCESS  | app.services.video:preprocess_video:1077 - image processed: ./storage/local_videos/31575ee9-9045-4976-a294-33c80ddf5636_sh150i-nhap-y-2012-757491-066759a9cc260d.png.mp4
+
+2026-06-06 03:37:10.442 | INFO     | app.services.task:generate_final_videos:215 - 
+
+## combining video: 1 => ./storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/combined-1.mp4
+
+2026-06-06 03:37:10.647 | INFO     | app.services.video:combine_videos:517 - audio duration: 62.14 seconds
+
+2026-06-06 03:37:10.648 | INFO     | app.services.video:combine_videos:518 - maximum clip duration: 4 seconds
+
+2026-06-06 03:37:11.702 | INFO     | app.services.video:_prioritize_unique_source_clips:117 - prioritized unique video materials, sources: 1, primary clips: 1, fallback clips: 0
+
+2026-06-06 03:37:11.705 | DEBUG    | app.services.video:combine_videos:565 - total subclipped items: 1
+
+2026-06-06 03:37:11.707 | DEBUG    | app.services.video:combine_videos:572 - processing clip 1: 2048x1536, source: 31575ee9-9045-4976-a294-33c80ddf5636_sh150i-nhap-y-2012-757491-066759a9cc260d.png.mp4, current duration: 0.00s, remaining: 62.14s
+
+2026-06-06 03:37:12.247 | DEBUG    | app.services.video:combine_videos:589 - resizing clip, source: 2048x1536, ratio: 1.33, target: 1080x1920, ratio: 0.56
+
+2026-06-06 03:38:08.446 | WARNING  | app.services.video:combine_videos:660 - video duration (4.00s) is shorter than audio duration (62.14s), looping clips to match audio length.
+
+2026-06-06 03:38:08.448 | INFO     | app.services.video:combine_videos:667 - video duration: 64.00s, audio duration: 62.14s, looped 15 clips
+
+2026-06-06 03:38:08.449 | INFO     | app.services.video:combine_videos:670 - starting clip merging process
+
+2026-06-06 03:38:08.449 | DEBUG    | app.services.video:delete_files:440 - failed to delete file ./storage/tasks/9f42c83d-ed81-4771-b0f5-6e6c05bb70f0/temp-clip-1.mp4: [Errno 2] No such file or directory: './storage/tasks/9f42c83d-ed81-4771-b0f5-6e6c05bb70f0/temp-clip-1.mp4'
+
+2026-06-06 03:38:08.450 | INFO     | app.services.video:combine_videos:684 - concatenating 16 clips with ffmpeg
+
+2026-06-06 03:40:25.957 | DEBUG    | app.services.video:delete_files:440 - failed to delete file ./storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/temp-clip-1.mp4: [Errno 2] No such file or directory: './storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/temp-clip-1.mp4'
+
+2026-06-06 03:40:25.959 | DEBUG    | app.services.video:delete_files:440 - failed to delete file ./storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/temp-clip-1.mp4: [Errno 2] No such file or directory: './storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/temp-clip-1.mp4'
+
+2026-06-06 03:40:25.960 | DEBUG    | app.services.video:delete_files:440 - failed to delete file ./storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/temp-clip-1.mp4: [Errno 2] No such file or directory: './storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/temp-clip-1.mp4'
+
+2026-06-06 03:40:25.961 | DEBUG    | app.services.video:delete_files:440 - failed to delete file ./storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/temp-clip-1.mp4: [Errno 2] No such file or directory: './storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/temp-clip-1.mp4'
+
+2026-06-06 03:40:25.962 | DEBUG    | app.services.video:delete_files:440 - failed to delete file ./storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/temp-clip-1.mp4: [Errno 2] No such file or directory: './storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/temp-clip-1.mp4'
+
+2026-06-06 03:40:25.963 | DEBUG    | app.services.video:delete_files:440 - failed to delete file ./storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/temp-clip-1.mp4: [Errno 2] No such file or directory: './storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/temp-clip-1.mp4'
+
+2026-06-06 03:40:25.964 | DEBUG    | app.services.video:delete_files:440 - failed to delete file ./storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/temp-clip-1.mp4: [Errno 2] No such file or directory: './storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/temp-clip-1.mp4'
+
+2026-06-06 03:40:25.964 | DEBUG    | app.services.video:delete_files:440 - failed to delete file ./storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/temp-clip-1.mp4: [Errno 2] No such file or directory: './storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/temp-clip-1.mp4'
+
+2026-06-06 03:40:25.965 | DEBUG    | app.services.video:delete_files:440 - failed to delete file ./storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/temp-clip-1.mp4: [Errno 2] No such file or directory: './storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/temp-clip-1.mp4'
+
+2026-06-06 03:40:25.966 | DEBUG    | app.services.video:delete_files:440 - failed to delete file ./storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/temp-clip-1.mp4: [Errno 2] No such file or directory: './storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/temp-clip-1.mp4'
+
+2026-06-06 03:40:25.966 | DEBUG    | app.services.video:delete_files:440 - failed to delete file ./storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/temp-clip-1.mp4: [Errno 2] No such file or directory: './storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/temp-clip-1.mp4'
+
+2026-06-06 03:40:25.967 | DEBUG    | app.services.video:delete_files:440 - failed to delete file ./storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/temp-clip-1.mp4: [Errno 2] No such file or directory: './storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/temp-clip-1.mp4'
+
+2026-06-06 03:40:25.968 | DEBUG    | app.services.video:delete_files:440 - failed to delete file ./storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/temp-clip-1.mp4: [Errno 2] No such file or directory: './storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/temp-clip-1.mp4'
+
+2026-06-06 03:40:25.969 | DEBUG    | app.services.video:delete_files:440 - failed to delete file ./storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/temp-clip-1.mp4: [Errno 2] No such file or directory: './storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/temp-clip-1.mp4'
+
+2026-06-06 03:40:25.970 | DEBUG    | app.services.video:delete_files:440 - failed to delete file ./storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/temp-clip-1.mp4: [Errno 2] No such file or directory: './storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/temp-clip-1.mp4'
+
+2026-06-06 03:40:25.970 | INFO     | app.services.video:combine_videos:695 - video combining completed
+
+2026-06-06 03:40:25.971 | INFO     | app.services.task:generate_final_videos:232 - 
+
+## generating video: 1 => ./storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/final-1.mp4
+
+2026-06-06 03:40:25.972 | INFO     | app.services.video:generate_video:806 - generating video: 1080 x 1920
+
+2026-06-06 03:40:25.973 | INFO     | app.services.video:generate_video:807 -   ① video: ./storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/combined-1.mp4
+
+2026-06-06 03:40:25.973 | INFO     | app.services.video:generate_video:808 -   ② audio: ./storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/audio.mp3
+
+2026-06-06 03:40:25.974 | INFO     | app.services.video:generate_video:809 -   ③ subtitle: ./storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/subtitle.srt
+
+2026-06-06 03:40:25.974 | INFO     | app.services.video:generate_video:810 -   ④ output: ./storage/tasks/85db15d9-c09d-4aee-89b2-0d13582f2185/final-1.mp4
+
+2026-06-06 03:40:25.975 | INFO     | app.services.video:generate_video:825 -   ⑤ font: ./resource/fonts/MicrosoftYaHeiBold.ttc
