@@ -304,6 +304,177 @@ class TestMotorcycleSalesPrompt(unittest.TestCase):
             [],
         )
 
+    def test_audit_public_price_accepts_common_separator_formats(self):
+        for rendered_price in ("68.000.000 đồng", "68,000,000đ", "68000000 VND"):
+            with self.subTest(rendered_price=rendered_price):
+                script = self._valid_script(
+                    self.listing,
+                    price_text=rendered_price,
+                )
+
+                issues = motorcycle_sales.audit_sales_script(script, self.listing)
+
+                self.assertNotIn("missing_public_price", issues)
+
+    def test_audit_public_price_accepts_exact_million_shorthand(self):
+        script = self._valid_script(self.listing, price_text="Giá bán 68 triệu")
+
+        issues = motorcycle_sales.audit_sales_script(script, self.listing)
+
+        self.assertNotIn("missing_public_price", issues)
+
+    def test_audit_public_price_flags_missing_configured_price(self):
+        script = self._valid_script(self.listing, price_text="Giá bán công khai")
+
+        issues = motorcycle_sales.audit_sales_script(script, self.listing)
+
+        self.assertIn("missing_public_price", issues)
+
+    def test_audit_public_price_is_not_satisfied_by_matching_model_year(self):
+        listing = self.listing.model_copy(
+            update={"price": 2012, "price_disclosure": PriceDisclosure.public}
+        )
+        script = self._valid_script(
+            listing,
+            extra="Xe đời 2012.",
+            price_text="",
+        )
+
+        issues = motorcycle_sales.audit_sales_script(script, listing)
+
+        self.assertIn("missing_public_price", issues)
+
+    def test_audit_contact_price_flags_contextual_sale_price_disclosure(self):
+        listing = self.listing.model_copy(
+            update={"price": None, "price_disclosure": PriceDisclosure.contact}
+        )
+
+        for disclosed_price in (
+            "Giá bán 68 triệu",
+            "Chốt xe 68.000.000 đồng",
+            "Xe đang để mức 68000k",
+            "Giá chỉ 68tr",
+        ):
+            with self.subTest(disclosed_price=disclosed_price):
+                script = self._valid_script(
+                    listing,
+                    extra=disclosed_price,
+                    price_text="",
+                )
+
+                issues = motorcycle_sales.audit_sales_script(script, listing)
+
+                self.assertIn("unexpected_price_disclosure", issues)
+
+    def test_audit_contact_price_ignores_unrelated_numbers(self):
+        listing = self.listing.model_copy(
+            update={
+                "price": None,
+                "price_disclosure": PriceDisclosure.contact,
+                "odometer_km": 25_000,
+                "odometer_disclosure": OdometerDisclosure.verified,
+            }
+        )
+        script = self._valid_script(
+            listing,
+            extra=(
+                "Xe đời 2012, ODO 25.000 km. "
+                "Liên hệ 0902 143 241 tại 08 Quang Trung."
+            ),
+            price_text="",
+        )
+
+        issues = motorcycle_sales.audit_sales_script(script, listing)
+
+        self.assertNotIn("unexpected_price_disclosure", issues)
+
+    def test_audit_restricted_odometer_flags_contextual_mileage_claims(self):
+        for disclosure in (
+            OdometerDisclosure.hidden,
+            OdometerDisclosure.not_verified,
+        ):
+            listing = self.listing.model_copy(
+                update={"odometer_disclosure": disclosure}
+            )
+            for mileage_claim in (
+                "ODO hiện 25.000",
+                "Xe mới đi 25 nghìn km",
+                "Đã đi 25.000 cây",
+            ):
+                with self.subTest(
+                    disclosure=disclosure,
+                    mileage_claim=mileage_claim,
+                ):
+                    script = self._valid_script(
+                        listing,
+                        extra=mileage_claim,
+                    )
+
+                    issues = motorcycle_sales.audit_sales_script(script, listing)
+
+                    self.assertIn("unexpected_odometer_claim", issues)
+
+    def test_audit_restricted_odometer_ignores_phone_year_and_address(self):
+        listing = self.listing.model_copy(
+            update={"odometer_disclosure": OdometerDisclosure.not_verified}
+        )
+        script = self._valid_script(
+            listing,
+            extra=(
+                "Xe đời 2012. Liên hệ 0902 143 241 "
+                "tại 08 Quang Trung để xem xe."
+            ),
+        )
+
+        issues = motorcycle_sales.audit_sales_script(script, listing)
+
+        self.assertNotIn("unexpected_odometer_claim", issues)
+
+    def test_audit_verified_odometer_accepts_configured_mileage(self):
+        listing = self.listing.model_copy(
+            update={
+                "odometer_km": 25_000,
+                "odometer_disclosure": OdometerDisclosure.verified,
+            }
+        )
+
+        for mileage in ("ODO 25.000 km", "Xe đã đi 25,000 cây", "ODO 25000"):
+            with self.subTest(mileage=mileage):
+                script = self._valid_script(listing, extra=mileage)
+
+                issues = motorcycle_sales.audit_sales_script(script, listing)
+
+                self.assertNotIn("missing_verified_odometer", issues)
+
+    def test_audit_verified_odometer_flags_missing_or_wrong_mileage(self):
+        listing = self.listing.model_copy(
+            update={
+                "odometer_km": 25_000,
+                "odometer_disclosure": OdometerDisclosure.verified,
+            }
+        )
+
+        for mileage_text in ("Không nhắc số km.", "ODO 32.000 km"):
+            with self.subTest(mileage_text=mileage_text):
+                script = self._valid_script(listing, extra=mileage_text)
+
+                issues = motorcycle_sales.audit_sales_script(script, listing)
+
+                self.assertIn("missing_verified_odometer", issues)
+
+    def test_audit_verified_odometer_is_not_satisfied_by_matching_model_year(self):
+        listing = self.listing.model_copy(
+            update={
+                "odometer_km": 2012,
+                "odometer_disclosure": OdometerDisclosure.verified,
+            }
+        )
+        script = self._valid_script(listing, extra="Xe đời 2012.")
+
+        issues = motorcycle_sales.audit_sales_script(script, listing)
+
+        self.assertIn("missing_verified_odometer", issues)
+
     def test_audit_uses_whitespace_insensitive_phone_and_key_address(self):
         script = self._valid_script(self.listing).replace(
             "0902 143 241",
@@ -330,10 +501,17 @@ class TestMotorcycleSalesPrompt(unittest.TestCase):
         self,
         listing: UsedMotorcycleListing,
         extra: str = "",
+        price_text: str | None = None,
     ) -> str:
+        if price_text is None:
+            price_text = (
+                motorcycle_sales.format_vnd(listing.price)
+                if listing.price_disclosure == PriceDisclosure.public
+                else ""
+            )
         required = (
             f"{listing.store_name} giới thiệu xe với {listing.legal_documents}. "
-            f"Liên hệ {listing.phone} tại {listing.address}. {extra}"
+            f"{price_text} Liên hệ {listing.phone} tại {listing.address}. {extra}"
         )
         filler_count = motorcycle_sales.TARGET_MIN_WORDS - len(required.split())
         return required + " " + " ".join(["xe"] * filler_count)
@@ -352,6 +530,34 @@ class TestMotorcycleSalesPreset(unittest.TestCase):
         self.assertEqual(
             motorcycle_sales.build_video_subject(listing),
             "Bán Air Blade đời 2021 tại Minh Dũng Quảng Ngãi",
+        )
+
+    def test_video_subject_derives_locality_from_listing_address(self):
+        listing = UsedMotorcycleListing(
+            name="Air Blade",
+            model_year="2021",
+            condition="Máy êm",
+            highlights=["Ngoại hình gọn"],
+            address="12 Lê Lợi, TP. Đà Nẵng",
+        )
+
+        self.assertEqual(
+            motorcycle_sales.build_video_subject(listing),
+            "Bán Air Blade đời 2021 tại Minh Dũng Đà Nẵng",
+        )
+
+    def test_video_subject_falls_back_to_full_address_without_commas(self):
+        listing = UsedMotorcycleListing(
+            name="Vision",
+            model_year="2020",
+            condition="Máy êm",
+            highlights=["Gọn nhẹ"],
+            address="Quảng Nam",
+        )
+
+        self.assertEqual(
+            motorcycle_sales.build_video_subject(listing),
+            "Bán Vision đời 2020 tại Minh Dũng Quảng Nam",
         )
 
     def test_sales_defaults_match_vertical_ordered_local_video(self):

@@ -118,6 +118,69 @@ def _without_whitespace(value: str) -> str:
     return re.sub(r"\s+", "", value).casefold()
 
 
+def _normalized_amount(value: str, multiplier: int = 1) -> str:
+    return str(int(re.sub(r"\D", "", value)) * multiplier)
+
+
+def _sale_price_amounts(script: str) -> set[str]:
+    normalized = script.casefold()
+    amount = r"\d+(?:[., ]\d+)*"
+    amounts = set()
+    currency_pattern = re.compile(
+        rf"(?P<amount>{amount})\s*(?P<marker>đồng|triệu|tr|vnd|k|đ)\b",
+        flags=re.IGNORECASE,
+    )
+    for match in currency_pattern.finditer(normalized):
+        marker = match.group("marker")
+        if marker == "k":
+            following = normalized[match.end() : match.end() + 8]
+            if re.match(r"\s*(?:km|cây)\b", following):
+                continue
+        multiplier = 1_000_000 if marker in {"triệu", "tr"} else 1
+        if marker == "k":
+            multiplier = 1_000
+        amounts.add(_normalized_amount(match.group("amount"), multiplier))
+
+    price_phrase_pattern = re.compile(
+        rf"\bgiá\b[^\d\r\n]{{0,24}}(?P<amount>{amount})",
+        flags=re.IGNORECASE,
+    )
+    for match in price_phrase_pattern.finditer(normalized):
+        amounts.add(_normalized_amount(match.group("amount")))
+    return amounts
+
+
+def _contains_public_price(script: str, price: int) -> bool:
+    return str(price) in _sale_price_amounts(script)
+
+
+def _contains_sale_price_disclosure(script: str) -> bool:
+    return bool(_sale_price_amounts(script))
+
+
+def _odometer_amounts(script: str) -> set[str]:
+    normalized = script.casefold()
+    amount = r"\d+(?:[., ]\d+)*"
+    patterns = (
+        rf"\bodo\b[^\d\r\n]{{0,24}}(?P<amount>{amount})",
+        rf"(?<!\d)(?P<amount>{amount})"
+        rf"\s*(?P<scale>nghìn|ngàn|k)?\s*(?:km|cây)\b",
+        rf"\bđi\b[^\d\r\n]{{0,20}}(?P<amount>{amount})"
+        rf"\s*(?P<scale>nghìn|ngàn|k)?\s*(?:km|cây)\b",
+    )
+    amounts = set()
+    for pattern in patterns:
+        for match in re.finditer(pattern, normalized):
+            scale = match.groupdict().get("scale")
+            multiplier = 1_000 if scale else 1
+            amounts.add(_normalized_amount(match.group("amount"), multiplier))
+    return amounts
+
+
+def _contains_odometer_claim(script: str) -> bool:
+    return bool(_odometer_amounts(script))
+
+
 def audit_sales_script(
     script: str,
     listing: UsedMotorcycleListing,
@@ -133,6 +196,18 @@ def audit_sales_script(
             and normalized_claim not in normalized_notes
         ):
             issues.append(f"unsupported_claim:{claim}")
+
+    if listing.price_disclosure == PriceDisclosure.public:
+        if not _contains_public_price(script, listing.price):
+            issues.append("missing_public_price")
+    elif _contains_sale_price_disclosure(script):
+        issues.append("unexpected_price_disclosure")
+
+    if listing.odometer_disclosure == OdometerDisclosure.verified:
+        if str(listing.odometer_km) not in _odometer_amounts(script):
+            issues.append("missing_verified_odometer")
+    elif _contains_odometer_claim(script):
+        issues.append("unexpected_odometer_claim")
 
     if _without_whitespace(listing.phone) not in _without_whitespace(script):
         issues.append("missing_phone")
@@ -164,10 +239,21 @@ def audit_sales_script(
     return issues
 
 
+def _address_locality(address: str) -> str:
+    locality = address.rsplit(",", maxsplit=1)[-1].strip() or address.strip()
+    cleaned = re.sub(
+        r"^(?:tp\.?|thành phố)\s*",
+        "",
+        locality,
+        flags=re.IGNORECASE,
+    )
+    return cleaned or address.strip()
+
+
 def build_video_subject(listing: UsedMotorcycleListing) -> str:
     return (
         f"Bán {listing.name} đời {listing.model_year} "
-        f"tại {listing.store_name} Quảng Ngãi"
+        f"tại {listing.store_name} {_address_locality(listing.address)}"
     )
 
 
